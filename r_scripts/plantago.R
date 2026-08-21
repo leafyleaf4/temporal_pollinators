@@ -4,6 +4,7 @@
 #sort illuminance 
 # make sure i understand exactly how all the assumptions plots and stuff mean. make sure im interpreting everything properly 
 # figure out how to do ggpredict model on top of the data points but for categorical 
+#does continuous or categorical actually make more sense?
 #############################
 
 
@@ -74,6 +75,7 @@ predict_ab1<- predict_ab1 %>%
   geom_line(data=predict_ab1, aes(x=time_period, y=pollinators_flower_minute)))
 #WAIT IDK HOW TO DO THIS FOR CATEGORICAL CUZ THE LINE DOESNT WORK OFC 
 #HOW DO I EVEN FIGURE OUT HOW TO FIX THIS 
+#is this even that important? 
 
 
 ##########################
