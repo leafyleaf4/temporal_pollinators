@@ -1,4 +1,12 @@
 
+###############################
+#TO DO NEXT TIME WORKING: 
+#sort illuminance 
+# make sure i understand exactly how all the assumptions plots and stuff mean. make sure im interpreting everything properly 
+# figure out how to do ggpredict model on top of the data points but for categorical 
+#############################
+
+
 library(tidyverse)
 library(readxl)
 library(ggthemes)
@@ -14,8 +22,6 @@ plantago_abundance<- read_excel("spreadsheets/P_lanceolata.xlsx", sheet = "numbe
 #still need to fix illuminance :( 
 #^ BRUH I FORGOT TO DO THIS 
 #REMEMBER TO DO THIS!!!!!!!!!!!!!!
-
-
 
 
 #sort out spreadhseets 
@@ -51,6 +57,23 @@ summary(abund1)
 #she's scuffed but not as scuffed as i expected???? 
 #r sq = 0.154 
 # poisson might be the vibe cuz is count data technically 
+
+
+
+
+#adding this in after doing the same thing wayy later on in script for time period as continuous not categorial
+predict_ab1<- ggpredict(abund1, c("time_period"))
+plot(predict_ab1)
+
+predict_ab1<- predict_ab1 %>% 
+  rename(time_period=x, pollinators_flower_minute = predicted) #rename parameters
+
+(predictplot1<- ggplot()+ 
+  geom_ribbon(data=predict_ab1, aes(x=time_period, ymin = conf.low, ymax=conf.high), alpha=0.3)+ #create confidence bands 
+  geom_point(data=plantago_abundance, aes(x=time_period, y=pollinators_flower_minute))+ #plot raw data
+  geom_line(data=predict_ab1, aes(x=time_period, y=pollinators_flower_minute)))
+#WAIT IDK HOW TO DO THIS FOR CATEGORICAL CUZ THE LINE DOESNT WORK OFC 
+#HOW DO I EVEN FIGURE OUT HOW TO FIX THIS 
 
 
 ##########################
@@ -92,7 +115,7 @@ exp(-6.297-1.456 )#mean D
 
 #anova
 car::Anova(abund2)
-#p value being 0.9997 feels suspiciously good... 
+#p value being 0.9997 seems suspiciously good... has something gone wrong? 
 #tbf the model doesnt fit the assumptions of the model very well... could be fake 
 #also hannah told us specifically to not use ANOVA and just look at summary instead
 #but its difficult to know what to take from there?????
@@ -196,6 +219,36 @@ predict_abund_num1<- predict_abund_num1 %>%
 #like its not really a linear relationship in the same way that an actual conditional variable is (rather than ordinal variable with bigg group in it)
 #like a lot can change in 3 hours, its a very wide window
 
+
+#try this but poisson 
+abund_num2<-glm(pollinators_flower_minute ~ time_period_numeric, data = plantago_abundance, family = "poisson")
+
+
+
+par(mfrow=c(2,2))
+plot(abund_num2) #asumptions
+par(mfrow=c(1,1))
+
+
+summary(abund_num2)
+
+#get r2 Approx R2 = (NullDeviance - ResidualDeviance)/NullDeviance 
+
+(0.044282-0.037156)/0.044282
+#0.1609232
+
+#sooo r2 when i had time period as categorial for poisson was 0.2522695, this is way lower. 
+
+#visualise:
+predict_abund_num2<- ggpredict(abund_num2, c("time_period_numeric"))%>% 
+  rename(time_period_numeric=x, pollinators_flower_minute = predicted)
+
+(modelplot2<- ggplot()+ 
+    geom_ribbon(data=predict_abund_num2, aes(x=time_period_numeric, ymin = conf.low, ymax=conf.high), alpha=0.3)+ #create confidence bands 
+    geom_point(data=plantago_abundance, aes(x=time_period_numeric, y=pollinators_flower_minute))+ #plot raw data
+    geom_line(data=predict_abund_num2, aes(x=time_period_numeric, y=pollinators_flower_minute))+
+    scale_y_log10(labels=scales::comma))#log the axis and raw data, and prevent scientific notation on y axis) 
+#okay i think i did this wrong cuz it looks weird asf 
 
 
 
