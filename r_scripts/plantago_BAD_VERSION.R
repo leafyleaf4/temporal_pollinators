@@ -164,6 +164,7 @@ summary(enviro4)
 
 #r2
 (0.044282-0.044274)/0.044282
+
 #0.0001806603 insanley low 
 
 #humidity not an important factor 

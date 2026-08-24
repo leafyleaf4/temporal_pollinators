@@ -5,6 +5,7 @@ library(performance)
 library(DHARMa)
 library(StatisticalModels)
 library(ggeffects)
+library(vegan)
 #some in here im not acc using, cant remember which
 
 #load data
@@ -17,6 +18,22 @@ plantago_abundance <- plantago_abundance %>%
          Date_numeric = as.Date(Date, format = "%d%b%Y")- as.Date("2026/06/22"), #column for how late in year
          pollinators_fm = pollinators_flower_minute, #fixing the annoyingly long name for pollinator per flower per minute
          time_period_numeric = as.numeric(time_period)) #making time period numeric, so is continuous 
+
+# adding in floral unit diversity 
+
+plantago_floral<-read_excel("spreadsheets/P_lanceolata.xlsx", sheet = "floral_units")
+#calculate diversity 
+PF<-plantago_floral[,-1] #removing dates cuz vegan package dont like that
+
+simpsons.diversity <-diversity(PF, index = "simpson") #calculating simpsons diversity for each day
+simpsons.diversity
+
+PF1<-plantago_floral %>% 
+  mutate(simpsons_diversity = simpsons.diversity) %>% #adding simpsons as a new column in dataframe
+  dplyr::select(Date, simpsons_diversity) #selecting only date and simpsoms column 
+
+plantago_abundance<-merge(plantago_abundance, PF1) #merge datasets
+
 
 
 #viasualise change in abundance over time of day 
@@ -107,7 +124,7 @@ plot(model9)
 summary(model9)
 #same as above
 
-model10<-lm(pollinators_fm ~ time_period_numeric+Solar_power+Temp_shade+Temp_sun+Humidity+Illuminance+Wind_max+Wind_min+Wind_average_every_10, data = plantago_abundance)
+model10<-lm(pollinators_fm ~ time_period_numeric+Solar_power+Temp_shade+Temp_sun+Humidity+Illuminance+Wind_max+Wind_min+Wind_average_every_10+simpsons_diversity, data = plantago_abundance)
 plot(model10)
 summary(model10)
 
@@ -116,6 +133,10 @@ plot(model11)
 summary(model11)
 ###tried a bunch of diff combos there
 
+model12<-lm(pollinators_fm ~ time_period_numeric*simpsons_diversity, data = plantago_abundance)
+plot(model12)
+summary(model12)
+#nothing 
 
 
 #so basucally theres no pattern lol. nothing explained nothing 
@@ -192,10 +213,5 @@ summary(datemod2)
 
 
 
-
-###############
-#now adding in floral units
-
-plantago_floral<-read_excel("spreadsheets/P_lanceolata.xlsx", sheet = "floral_units")
 
 
