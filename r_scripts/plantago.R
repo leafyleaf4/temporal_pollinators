@@ -1,10 +1,6 @@
 
 ###############################
-#TO DO NEXT TIME WORKING: 
-#sort illuminance 
-# make sure i understand exactly how all the assumptions plots and stuff mean. make sure im interpreting everything properly 
-# figure out how to do ggpredict model on top of the data points but for categorical 
-#does continuous or categorical actually make more sense?
+#this is the shit script fr dont look at this 
 #############################
 
 
@@ -28,16 +24,17 @@ plantago_abundance<- read_excel("spreadsheets/P_lanceolata.xlsx", sheet = "numbe
 #sort out spreadhseets 
 plantago_abundance <- plantago_abundance %>% 
   mutate(time_period = as.factor(time_period), 
-         Date_numberic = as.Date(Date, format = "%d%b%Y")- as.Date("2026/06/22")) #column for how late in year
+         Date_numberic = as.Date(Date, format = "%d%b%Y")- as.Date("2026/06/22"), #column for how late in year
+         pollinators_fm = pollinators_flower_minute) #fixing the annoyingly long name for pollinator per flower per minute
 
 
 #viasualise change in abundance over time of day 
-(abundance_time<-ggplot(plantago_abundance, aes(x=time_period, y=pollinators_flower_minute))+
+(abundance_time<-ggplot(plantago_abundance, aes(x=time_period, y=pollinators_fm))+
   geom_boxplot()+
-  geom_point(col="blue"))
-#lich so ugly :(
-#bascially for each time period, how many polllinators we typically had
-#deffo have more in the morning, but is this significant???? need anova type thing 
+  geom_point(col="blue")+
+  theme_few()+
+  labs)
+#definitely have more in the morning, but is this significant???? need anova type thing
 
 
 
@@ -48,31 +45,31 @@ plantago_abundance <- plantago_abundance %>%
 
 
 #basic linear model
-abund1<- lm(pollinators_flower_minute ~ time_period, data = plantago_abundance)
-
+abund1<- lm(pollinators_fm ~ time_period, data = plantago_abundance)
 
 par(mfrow=c(2,2))
 plot(abund1) #asumptions
 par(mfrow=c(1,1))
+
+#residuals fitted line is not the best but could be acceptable? not 100% sure. q-q is good enough 
+#scale location is clearly going up - voilates constant variance 
+#constant leverage is fine
+
 summary(abund1)
-#she's scuffed but not as scuffed as i expected???? 
 #r sq = 0.154 
-# poisson might be the vibe cuz is count data technically 
 
 
-
-
-#adding this in after doing the same thing wayy later on in script for time period as continuous not categorial
+#show model
 predict_ab1<- ggpredict(abund1, c("time_period"))
 plot(predict_ab1)
-
+######
 predict_ab1<- predict_ab1 %>% 
-  rename(time_period=x, pollinators_flower_minute = predicted) #rename parameters
+  rename(time_period=x, pollinators_fm = predicted) #rename parameters
 
 (predictplot1<- ggplot()+ 
   geom_ribbon(data=predict_ab1, aes(x=time_period, ymin = conf.low, ymax=conf.high), alpha=0.3)+ #create confidence bands 
-  geom_point(data=plantago_abundance, aes(x=time_period, y=pollinators_flower_minute))+ #plot raw data
-  geom_line(data=predict_ab1, aes(x=time_period, y=pollinators_flower_minute)))
+  geom_point(data=plantago_abundance, aes(x=time_period, y=pollinators_fm))+ #plot raw data
+  geom_line(data=predict_ab1, aes(x=time_period, y=pollinators_fm)))
 #WAIT IDK HOW TO DO THIS FOR CATEGORICAL CUZ THE LINE DOESNT WORK OFC 
 #HOW DO I EVEN FIGURE OUT HOW TO FIX THIS 
 #is this even that important? 
@@ -82,27 +79,19 @@ predict_ab1<- predict_ab1 %>%
 #poisson model
 #########################
 
-abund2<-glm(pollinators_flower_minute ~ time_period, data = plantago_abundance, family="poisson")
+abund2<-glm(pollinators_fm ~ time_period, data = plantago_abundance, family="poisson")
 
 summary(abund2)
-
-
-
-
 #check assumptions
 simulateResiduals(fittedModel = abund2, plot = T)
 #SO SCUFFED!!!!!
-#try w/fixed effects or random effects
+#bad fit for qq - poisson isnt a good fit for our data. was just plain linear model better? 
+#not fully sure how to interpret resuduals vs fitted here? 
 
-
-#get r2 (Approx R2 = (NullDeviance - ResidualDeviance)/NullDeviance )
-
+#get r2. Approx R2 = (NullDeviance - ResidualDeviance)/NullDeviance
 #r2
 (0.044282-0.033111)/0.044282
 # = 0.2522695
-
-
-
 summary(abund2)
 
 exp(-6.297) #mean A
@@ -114,84 +103,176 @@ exp(-6.297-1.116) #mean c
 exp(-6.297-1.456 )#mean D
 #0.0004294522
 
-
 #anova
 car::Anova(abund2)
 #p value being 0.9997 seems suspiciously good... has something gone wrong? 
-#tbf the model doesnt fit the assumptions of the model very well... could be fake 
-#also hannah told us specifically to not use ANOVA and just look at summary instead
-#but its difficult to know what to take from there?????
+
+#r2 for poisson model seems better, however the lm might fit the data better
 
 
 
-################
-##plot all the abiotic factos on abundance, see if any look like they might be important 
+
+
+
+
+########################
+##plot and make models for all the abiotic factos on abundance, see if any look like they might be important 
+#########################
 
 #solar power
 (abundance_time<-ggplot(plantago_abundance, aes(x=Solar_power, y=pollinators_flower_minute))+
    geom_point())
 
+enviro1<-lm(pollinators_fm~Solar_power, data=plantago_abundance)
+
+summary(enviro1)
+#rsq is 0.02 -only 2 percent of variation explained 
+#p not sig tho 
+par(mfrow=c(2,2))
+plot(enviro1) #asumptions
+par(mfrow=c(1,1))
+#not bad 
+
+#poisson 
+enviro2<- glm(pollinators_fm~Solar_power, data=plantago_abundance, family = "poisson")
+summary(enviro2)
+
+#r2 
+(0.044282-0.043429)/0.044282
+#0.01, so still awful
+
+#solar power not an important factor 
+
 #humidity
 (abundance_time<-ggplot(plantago_abundance, aes(x=Humidity, y=pollinators_flower_minute))+
     geom_point())
+
+
+
+enviro3<-lm(pollinators_fm ~Humidity, data=plantago_abundance)
+
+par(mfrow=c(2,2))
+plot(enviro3) #asumptions
+par(mfrow=c(1,1))
+#not great, could be worse 
+
+summary(enviro3)
+#r square so bad it went negative 
+
+enviro4<-glm(pollinators_fm~Humidity, data =plantago_abundance, family = "poisson")
+summary(enviro4)
+
+#r2
+(0.044282-0.044274)/0.044282
+#0.0001806603 insanley low 
+
+#humidity not an important factor 
+
 
 #temp sun
 (abundance_time<-ggplot(plantago_abundance, aes(x=Temp_sun, y=pollinators_flower_minute))+
     geom_point())
 #slight negative trend
 
+enviro5<-lm(pollinators_fm~Temp_sun, data = plantago_abundance)
+
+par(mfrow=c(2,2))
+plot(enviro5) #asumptions
+par(mfrow=c(1,1))
+ 
+summary(enviro5)
+#again negative r2
+#temp sun not important
+
+
 #temp shade 
 (abundance_time<-ggplot(plantago_abundance, aes(x=Temp_shade, y=pollinators_flower_minute))+
     geom_point())
 #also slight negative trend 
 
+enviro6<-lm(pollinators_fm ~ Temp_shade, data = plantago_abundance)
+
+par(mfrow=c(2,2))
+plot(enviro6) #asumptions
+par(mfrow=c(1,1))
+
+summary(enviro6)
+#negative r2, temp shade not important 
+
 
 #wind max
 (abundance_time<-ggplot(plantago_abundance, aes(x=Wind_max, y=pollinators_flower_minute))+
     geom_point())
-#maybe??
+enviro7<-lm(pollinators_fm~Wind_max, data=plantago_abundance)
+
+par(mfrow=c(2,2))
+plot(enviro7) #asumptions
+par(mfrow=c(1,1))
+
+summary(enviro7)
+#negative r2, wind max not important 
+
 
 #average wind
 (abundance_time<-ggplot(plantago_abundance, aes(x=Wind_average_every_10, y=pollinators_flower_minute))+
     geom_point())
 # wtf is going on here??????
+enviro8<-lm(pollinators_fm~Wind_average_every_10, data=plantago_abundance)
 
-#okay that didnt help much lol lets just test the models
+par(mfrow=c(2,2))
+plot(enviro8) #asumptions
+par(mfrow=c(1,1))
+
+summary(enviro8)
+#negative r squared 
+
+#############
+#from this have discovered that the only abiotic factor that did not give a negative r squared was 
+#solar power, however it was literally 0.01 or 0.02 which doesnt rly mean much 
 
 
 
-####################################
-#Generalised mixed effects linear model
-#####################
 
-#model with solar power as random effect
-abund3<- glmer(pollinators_flower_minute ~ time_period +(1|Solar_power), data = plantago_abundance, family="poisson")
+##############
+#trying to include solar power in model
+##########
 
-#check assumptions 
+abund3<-glm(pollinators_fm~time_period + Solar_power, data = plantago_abundance, family="poisson")
 simulateResiduals(fittedModel = abund3, plot = T)
-#still crap. is it all the 0s? 
+#still shite
+summary(abund3)
+#r2
+(0.044282-0.032997)/0.044282
+#0.254844
+#literally no difference
 
-R2GLMER(abund3)
 
-#reminding myself of what stuff means: 
-#conditional R2 = variance explained by the fixed and random effect
-#marginal = just fixed effects 
-#so???? only 18% is explained by time, and 41% explained by solar radiation? 
+#just lm 
+abund4<-lm(pollinators_fm~time_period + Solar_power, data = plantago_abundance)
+
+par(mfrow=c(2,2))
+plot(abund4) #asumptions
+par(mfrow=c(1,1))
+
+summary(abund4)
+#rsq is 0.1196 which is actually WORSE than before. 
+
+
+
+
+
+
+
 
 
 
 ##################
-#daniel was sying like to make the time periods continuous rather than categorical.
-#feel like this could be bad cuz are we expecting a simple straightforwards linear regresssion in this context? 
-#probably not? but ill try it anyways 
-#also going to try car::ANOVA after looking up what it does - remember to do this !!!!
+# time periods continuous rather than categorical.
 
-#make column for numeric time period 
 
 plantago_abundance <- plantago_abundance %>% mutate(time_period_numeric = as.numeric(time_period))
 
 abund_num1<-lm(pollinators_flower_minute ~ time_period_numeric, data = plantago_abundance)
-
 
 #check assumptions 
 par(mfrow=c(2,2))
@@ -201,11 +282,14 @@ par(mfrow=c(1,1))
 summary(abund_num1)
 confint(abund_num1)
 #my brain still doesnt love that this is technically. need to visualise this
+#r2 is 0.09. worse than when categorical
+#p value bad tho
 
 predict_abund_num1<- ggpredict(abund_num1, c("time_period_numeric"))
+
 plot(predict_abund_num1) #plot predicted values 
 
-#i want to see this with the data on top because im not convinced
+#i want to see this with the data on top 
 
 predict_abund_num1<- predict_abund_num1 %>% 
   rename(time_period_numeric=x, pollinators_flower_minute = predicted) #rename parameters
@@ -216,24 +300,72 @@ predict_abund_num1<- predict_abund_num1 %>%
                  geom_line(data=predict_abund_num1, aes(x=time_period_numeric, y=pollinators_flower_minute))) #plotting regression line )
 
 #ik this is just basic linear model and i need to try other stuff + whatever, 
-#but im not sure if im convinced by considering them continuous 
-#i would if we had recorded constantly all day, and recorded the times each time one visited rather than such big time periods
-#like its not really a linear relationship in the same way that an actual conditional variable is (rather than ordinal variable with bigg group in it)
-#like a lot can change in 3 hours, its a very wide window
+
+
+
+#################
+#with fixed effects or interactions terms 
+
+model2<-lm(pollinators_flower_minute ~ time_period_numeric + Solar_power, data = plantago_abundance)
+
+par(mfrow=c(2,2))
+plot(model2) #asumptions
+par(mfrow=c(1,1))
+
+summary(model2)
+
+#solar power actually makes a difference here
+#p value scuffed 
+
+model3<-lm(pollinators_flower_minute ~ time_period_numeric*Solar_power, data = plantago_abundance)
+par(mfrow=c(2,2))
+plot(model3) #asumptions
+par(mfrow=c(1,1))
+
+summary(model3)
+#okay now time period is actually significant, but solar power isnt? sooo
+
+
+#temperature
+model4<-lm(pollinators_fm~time_period_numeric  + Temp_sun, data = plantago_abundance)
+par(mfrow=c(2,2))
+plot(model4) #asumptions
+par(mfrow=c(1,1))
+
+summary(model4)
+#nah
+################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #try this but poisson 
 abund_num2<-glm(pollinators_flower_minute ~ time_period_numeric, data = plantago_abundance, family = "poisson")
 
-
-
-par(mfrow=c(2,2))
-plot(abund_num2) #asumptions
-par(mfrow=c(1,1))
-
+simulateResiduals(fittedModel = abund_num2, plot = T)
+#same scuffed fit 
 
 summary(abund_num2)
-
 #get r2 Approx R2 = (NullDeviance - ResidualDeviance)/NullDeviance 
 
 (0.044282-0.037156)/0.044282
@@ -249,8 +381,34 @@ predict_abund_num2<- ggpredict(abund_num2, c("time_period_numeric"))%>%
     geom_ribbon(data=predict_abund_num2, aes(x=time_period_numeric, ymin = conf.low, ymax=conf.high), alpha=0.3)+ #create confidence bands 
     geom_point(data=plantago_abundance, aes(x=time_period_numeric, y=pollinators_flower_minute))+ #plot raw data
     geom_line(data=predict_abund_num2, aes(x=time_period_numeric, y=pollinators_flower_minute))+
-    scale_y_log10(labels=scales::comma))#log the axis and raw data, and prevent scientific notation on y axis) 
+    scale_y_log10(labels=scales::comma))#log the axis and raw data, and prevent scientific notation on y axis???) 
 #okay i think i did this wrong cuz it looks weird asf 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -304,6 +462,57 @@ ggsave("plots/Pl_pollinator_occurance.png", width = 12, height = 9, dpi = 600)
 
 
   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##################
+#SCRAPPED SECTIONS 
+############################################
+#SCRAP THIS WHOLE SECTION!!!!!!
+#################################
+#literally scrap this entire bit of code cuz i just realised that continuous variables cant be random effects. 
+
+#model with solar power as random effect
+abund3<- glmer(pollinators_fm ~ time_period +(1|Solar_power), data = plantago_abundance, family="poisson")
+
+#check assumptions 
+simulateResiduals(fittedModel = abund3, plot = T)
+#equally as bad as without random effect? 
+
+R2GLMER(abund3)
+
+#reminding myself of what stuff means: 
+#conditional R2 = variance explained by the fixed and random effect
+#marginal = just fixed effects 
+#so???? only 18% is explained by time, and 41% explained by solar radiation? 
+#is that right? 
+
+#will try with all the other parameters then 
+abund4<- glmer(pollinators_fm ~ time_period +(1|Humidity), data = plantago_abundance, family="poisson")
+simulateResiduals(fittedModel = abund4, plot = T)
+R2GLMER(abund4)
+#18 by time, 59 overall 
+
+abund5<- glmer(pollinators_fm ~time_period + (1|Humidity) + (1|Solar_power), data=plantago_abundance, family = "poisson")
+simulateResiduals(fittedModel = abund5, plot = T)
+R2GLMER(abund5)
+#12 by time, 59 overall what 
+
+
+
+#normal linear model, with fixed effects?
+abund6<-lmer(pollinators_fm~time_period + (1|Solar_power), data = plantago_abundance)
 
 
 
